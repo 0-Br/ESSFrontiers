@@ -1,0 +1,190 @@
+\documentclass[12pt, a4paper]{article}
+
+\usepackage{ctex}
+\usepackage{float, booktabs, parskip}
+\usepackage{amsmath, amsthm, amssymb, mathrsfs, bm}
+\usepackage{geometry}
+\usepackage{hyperref}
+
+\geometry{a4paper, left=2cm, right=2cm, top=2.5cm, bottom=2.5cm}
+
+\setlength{\parindent}{2em}
+\setlength{\parskip}{0.5em}
+\allowdisplaybreaks[4]
+
+
+
+% --- Vectors and Fields ---
+\newcommand{\ivec}[1]{\bm{#1}}                  % General vector
+\newcommand{\pos}{\ivec{x}}                     % Position vector
+\newcommand{\scalarfield}{u}                    % Scalar field (e.g., temperature)
+\newcommand{\domain}{\Omega}                    % Spatial domain
+\newcommand{\ket}[1]{\left| #1 \right\rangle}   % Right ket vector
+\newcommand{\bra}[1]{\left\langle #1 \right|}   % Left bra vector
+
+% --- Operators ---
+\newcommand{\laplacian}{\nabla^2}       % Laplacian operator
+\newcommand{\hamiltonian}{\hat{H}}      % Hamiltonian operator
+\newcommand{\modelop}{\mathcal{M}}      % Dynamical model operator
+\newcommand{\obsop}{\mathcal{H}}        % Observation operator
+
+% --- Matrices ---
+\newcommand{\mat}[1]{\mathbf{#1}}               % General matrix
+\newcommand{\transpose}[1]{{#1}^{\mathrm{T}}}   % Transpose symbol
+\newcommand{\inv}[1]{{#1}^{-1}}                 % Matrix inverse
+\newcommand{\bgerrcov}{\mat{B}}                 % Background error covariance
+\newcommand{\obserrcov}{\mat{R}}                % Observation error covariance
+
+
+
+\title{{\Large{\textbf{关于《HASM量子智能计算方法的前世今生》讲座的思考}}}}
+\author{刘滨瑞 \\ 地球系统科学系 \quad \href{mailto:lbr21@mails.tsinghua.edu.cn}{lbr21@mails.tsinghua.edu.cn}}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+
+
+9月25日，在《地球系统科学前沿》课程中，岳天祥老师为我们带来了题为《HASM量子智能计算方法的前世今生》的精彩讲座。岳老师不仅深入浅出地介绍了HASM方法的基本原理，还阐述了将其与量子计算结合的前沿探索。以下，我将结合自身的知识背景，分享一些个人的理解与思考。
+
+
+
+\section{基于微分几何的对HASM的再理解}
+
+\textbf{高精度曲面建模 (High-Accuracy Surface Modeling, HASM)}，是岳天祥老师带领团队建立的一套数学框架，旨在消解地球表层系统建模中误差累积与多尺度耦合的难题。其核心任务是：依据空间上离散分布的精确观测，构建一个连续、光滑且符合物理规律的全域高精度曲面。
+
+HASM的理论基石是岳老师提出的\textbf{地球表层系统建模基本定理}。该定理断言，地球表层系统的几何形态，被两类性质的信息共同且唯一地确定：
+\begin{itemize}
+    \item \textbf{内蕴量 (Intrinsic Quantities)}: 精度高但空间稀疏或不连续的局地信息，如地面台站的实测数据。
+    \item \textbf{外蕴量 (Extrinsic Quantities)}: 空间连续、覆盖全域但精度或分辨率相对较低的全局信息，如卫星遥感产品或粗网格数值模式的输出。
+\end{itemize}
+
+这使我联想到了微分几何中的\textbf{曲面基本定理 (Bonnet 定理)}。Bonnet 定理指出，一个嵌入在三维欧氏空间 $\mathbb{R}^3$ 中的曲面，其几何性质被两组量唯一确定：第一基本形式和第二基本形式。前者与“内蕴量”的概念相契合，决定了曲面内部的“内蕴度量”，如长度、角度与面积等；后者则与“外蕴量”的概念一致，描述了曲面在背景空间中的“外蕴嵌入方式”，即曲面朝着法线方向弯曲的程度。
+
+因此，我倾向于将HASM理解为一个求解变分问题的计算框架，其目标是重构一个曲面，使得该曲面的第一基本形式被稀疏的“内蕴”观测所约束，而第二基本形式则被全局的“外蕴”场所引导。事实上，我认为这与现代天气和海洋预报中广泛应用的\textbf{数据同化 (Data Assimilation)} 技术，例如ERA5资料采用的四维变分同化 (4D-Var) 算法是相似的。HASM的独特之处在于其“外蕴量”为物理光滑性假设，而非时间动力学模型。从这一角度，我们也可以将HASM理解为一个纯空间维度的变分同化系统。
+
+综上所述，HASM可以被视为一个以微分几何理论为基础、融合内蕴与外蕴信息的空间变分同化框架。
+我们可以通过求解泛函 $J(\scalarfield)$ 取最小值的标量场 $\scalarfield$，得到对物理量的最优估计:
+\begin{equation}
+    \min_{\scalarfield} J(\scalarfield) = \min_{\scalarfield} \left[ \sum_{i \in \text{obs}} \left( \scalarfield(\pos_i) - \scalarfield_{\text{obs},i} \right)^2 + \lambda \int_{\domain} \left( \laplacian \scalarfield(\pos) \right)^2 d\pos \right]
+\end{equation}
+
+为进行数值求解，我们需对该连续泛函作离散化。通过对定义域 $\domain$ 进行网格化，并使用有限差分法近似拉普拉斯算子 $\laplacian$，该变分优化问题最终转化为一个大型、稀疏、对称正定的线性方程组：
+\begin{equation}
+    (\transpose{\mat{O}} \mat{O} + \lambda \transpose{\mat{L}} \mat{L}) \ivec{\scalarfield} = \transpose{\mat{O}} \ivec{\scalarfield}_{\text{obs}}
+\end{equation}
+
+其中，$\ivec{\scalarfield}$ 是包含所有网格点未知值的向量，$\ivec{\scalarfield}_{\text{obs}}$ 是观测值向量，$\mat{O}$ 是一个稀疏的观测算子（将全域向量 $\ivec{\scalarfield}$ 映射至观测点），而 $\mat{L}$ 是离散化的拉普拉斯算子矩阵。令 $\mat{A} = \mat{O}^\mathrm{T} \mat{O} + \lambda \mat{L}^\mathrm{T} \mat{L}$ 和 $\ivec{b} = \mat{O}^\mathrm{T} \ivec{\scalarfield}_{\text{obs}}$，问题即归结为求解标准线性系统：
+\begin{equation}
+    \mat{A}\ivec{\scalarfield} = \ivec{b}
+\end{equation}
+
+然而，在实际应用中$\mat{A}$通常是高维、稀疏且条件数较大的矩阵，这导致经典求解方法（如共轭梯度法、LU分解等）的计算成本极高。如何突破这一计算瓶颈，已经成为了HASM进一步发展的关键问题。
+
+
+
+\section{量子计算加速：HHL算法}
+
+岳老师指出，随着地球系统模式分辨率由公里级提升至米级，线性系统的维度 $N$ 将呈指数级增长，远超经典计算的可承受范围。此时，任何复杂度为 $\text{poly}(N)$ 的经典算法都将难以胜任甚高维问题的求解。因此，探索全新的计算范式——量子计算，成为突破算力瓶颈的必然选择。
+
+Harrow-Hassidim-Lloyd (HHL) 算法是一个为求解线性方程组 $\mat{A}\ivec{\scalarfield} = \ivec{b}$ 设计的量子算法。考虑到大部分的同学们没有学习过量子力学，所以我将尝试用更基础的数学和物理语言来解释本节的内容。
+
+在量子力学中，系统的状态用\textbf{“态矢量”} $\ket{\phi}$ 表示，在数学上可以简单理解为希尔伯特空间中的一个单位复向量。
+物理量（如能量、位置等）用\textbf{“算符”} $\hat{O}$ 表示。算符作用在态矢量上，得到新的态或测量结果。例如，哈密顿算符 $\hat{H}$ 描述了系统的能量。其中，对于可观测量，算符是厄米 (Hermitian) 的——这意味着算符的特征值都是实数，且特征向量构成一个完备正交基。
+
+量子计算的本质，是用\textbf{量子比特 (qubit)} 来编码和处理信息。一个由 $n$ 个量子比特组成的系统，其状态空间的维度为 $N=2^n$，具有$N$个基（即$N$个二进制基态），用 $\ket{i}$ 表示。
+我们可以将一个 $N$ 维的经典向量 $\ivec{\scalarfield} = \transpose{(u_0, u_1, \ldots, u_{N-1})}$ 编码为量子态：
+\begin{equation*}
+    \ket{\scalarfield} = \sum_{i=0}^{N-1} u_i \ket{i}
+\end{equation*}
+
+原本需要 $N$ 个经典数存储的信息，被“压缩”为 $n = \log_2 N$ 个量子比特的叠加态。
+这样，我们利用量子比特实现了指数级的状态空间扩展，这是量子计算能够高效处理高维数据的根本原因。
+
+HHL算法的核心思想，是将线性方程组的求解过程映射为量子态的演化过程。
+具体而言，首先需要将输入向量 $\ivec{b}$ 编码为量子态 $\ket{b}$，这一步被称为“量子态制备”。
+随后，算法将利用\textbf{量子相位估计 (Quantum Phase Estimation, QPE)} 技术，高效地提取矩阵 $\mat{A}$ 的特征值信息。
+设$\mat{A}$为厄米矩阵，其谱分解为$\mat{A} = \sum_j \lambda_j |\phi_j\rangle\langle\phi_j|$。假设输入态$\ket{b}$可在$\mat{A}$的本征基展开为$\ket{b} = \sum_j \beta_j |\phi_j\rangle$。
+
+QPE的目标是对$\mat{A}$的本征态$|\phi_j\rangle$，高效估算其本征值$\lambda_j$。具体步骤如下：
+
+\begin{enumerate}
+    \item $\mat{A}$ 为厄米矩阵，其谱分解为 $\mat{A} = \sum_j \lambda_j \ket{\phi_j} \bra{\phi_j}$；输入态 $\ket{b}$可在$\mat{A}$ 的本征基展开为 $\ket{b} = \sum_j \beta_j \ket{\phi_j}$。
+
+    \item 准备两个量子寄存器：第一个为 $m$ 个辅助比特（用于存储本征值的二进制近似），第二个为 $n$ 个比特（用于存储 $\ket{b}$ 的本征态分解）。初始状态为：
+    \begin{equation*}
+        \ket{0}^{\otimes m} \otimes \ket{b} = \sum_j \beta_j \ket{0}^{\otimes m} \ket{\phi_j}
+    \end{equation*}
+
+    \item 对辅助寄存器施加 $m$ 次Hadamard门（即作用酉算符 $H = \frac{1}{\sqrt{2}}\begin{pmatrix} 1 & 1 \\ 1 & -1 \end{pmatrix}$）：
+    \begin{equation*}
+        H^{m} \left(\sum_j \beta_j \ket{0}^{\otimes m} \ket{\phi_j}\right) = H^{m} \ket{0}^{\otimes m} \sum_j \beta_j \ket{\phi_j} = \frac{1}{2^{m/2}} \sum_{k=0}^{2^m-1} \ket{k} \sum_j \beta_j \ket{\phi_j}
+    \end{equation*}
+
+    \item 对每个辅助比特 $k$，施加受控幺正演化门 $U^{2^k}$，其中 $U = e^{2\pi i \mat{A}}$。由于 $\mat{A}$ 的本征态 $\ket{\phi_j}$ 满足 $U \ket{\phi_j} = e^{2\pi i \lambda_j} \ket{\phi_j}$，因此整个系统演化为：
+    \begin{align*}
+        \frac{1}{2^{m/2}} \sum_{k=0}^{2^m-1} U^{k} \left(\ket{k} \sum_j \beta_j \ket{\phi_j}\right)
+        &= \frac{1}{2^{m/2}} \sum_{k=0}^{2^m-1} \ket{k} \left( \sum_j \beta_j e^{2\pi i k \lambda_j} \ket{\phi_j} \right) \\
+        &= \sum_j \beta_j \left(\frac{1}{2^{m/2}} \sum_{k=0}^{2^m-1} e^{2\pi i k \lambda_j} \ket{k}\right) \ket{\phi_j}
+    \end{align*}
+
+    \item 对辅助寄存器施加逆量子傅里叶变换（$\text{QFT}^{-1}$），即可将每个 $\lambda_j$ 的二进制近似 $\tilde{\lambda}_j$ 编码到辅助寄存器中。最终，系统状态为:
+    \begin{equation*}
+        \sum_j \beta_j \ket{\tilde{\lambda}_j} \ket{\phi_j}
+    \end{equation*}
+    其中 $\ket{\tilde{\lambda}_j}$ 是对本征值 $\lambda_j$ 的 $m$ 位二进制近似。
+\end{enumerate}
+
+引入一个辅助量子比特，并执行一次受控旋转操作。该操作以存储着 $\ket{\tilde{\lambda}_j}$ 的辅助寄存器为控制位，旋转的角度正比于 $C/\tilde{\lambda}_j$（$C$为常数），从而将本征值的信息转化为其倒数的信息，并编码为辅助比特的振幅。
+
+最后，通过逆量子相位估计等操作并对辅助比特进行测量，若测量结果为1，则系统余下的部分将以高概率塌缩到目标量子态 $\ket{\scalarfield}$。该量子态为：
+\begin{equation*}
+    \ket{\scalarfield} \propto \sum_j \beta_j \frac{1}{\lambda_j} \ket{\phi_j} = \left( \sum_j \frac{1}{\lambda_j} \ket{\phi_j}\bra{\phi_j} \right) \left( \sum_k \beta_k \ket{\phi_k} \right) = \mat{A}^{-1} \ket{b}
+\end{equation*}
+
+量子态$\ket{\scalarfield}$即为线性系统的解态，与经典解$\ivec{\scalarfield} = \mat{A}^{-1}\ivec{b}$成正比。
+
+HHL算法的理论运行时间复杂度为 $\mathcal{O}(\log^2(N) s^2 \kappa^2)$，其中 $s$ 是矩阵 $\mat{A}$ 的稀疏度，$\kappa$ 是矩阵 $\mat{A}$ 的条件数。
+$\mathcal{O}(\log^2(N))$主要来自于逆量子傅里叶变换，$\mathcal{O}(s^2)$主要来自于幺正演化门的实现，而$\mathcal{O}(\kappa^2)$则源于受控旋转步骤中对小特征值的处理。
+
+在矩阵 $\mat{A}$ 是稀疏 ($s$ 较小) 且良态 ($\kappa$ 较小) 的情况下，HHL算法实现了对高维线性系统的指数级加速。我总是喜欢用一个简单的比喻来解释这一点：量子计算更像是在进行一场物理实验，而不是传统意义上的数值计算。我们只需设计好实验步骤（量子电路），让量子态按照物理规律自然演化（各种量子门），最终进行一次测量即可获得所需信息。其核心优势在于利用了量子叠加和干涉效应，使得信息能够在指数级扩展的状态空间中“并行”处理，从而极为高效地求解大规模问题。
+
+然而，HHL算法对量子比特的相干时间和门保真度要求极高，因为在计算过程中需要连续执行多个操作步骤，且每一步都必须非常精确，否则结果就会失真。此外，算法还需要高效的量子态制备和测量技术，以确保输入输出的准确性。这些对硬件的苛刻要求，使得HHL算法在当前的量子计算机上难以实现。
+
+
+
+\section{NISQ时代的量子计算：VQLS}
+
+岳老师在讲座中指出，HHL算法虽在理论上展示了指数级加速的美好前景，但其对硬件的要求远超当前时代的技术水平。我们处于且预计将长期处于量子比特数小、噪音水平高的\textbf{嘈杂中型量子 (NISQ)} 时代，这迫使研究者们探索更符合现实硬件条件的替代方案。
+
+一种可能的方案是\textbf{变分量子算法 (Variational Quantum Algorithms, VQA)}——一个经典-量子混合的迭代式框架。针对线性系统求解这一特定问题，岳老师向我们介绍了 \textbf{变分量子线性求解器 (Variational Quantum Linear Solver, VQLS)}。其核心思想是：不再试图直接构造出解 $\mat{A}^{-1}\ket{b}$，而是将问题转化为一个优化任务，利用浅层、抗噪性更强的量子电路与经典优化器协同工作，通过迭代逼近真实解。在我看来，VQLS的核心思想类似于机器学习中的\textbf{梯度下降 (Gradient Descent)} 优化过程。其目标不再是直接构造出解，而是将求解线性方程组转化为一个参数化优化问题：
+
+\begin{enumerate}
+    \item 首先定义一个\textbf{成本函数 $C(\ivec{\theta})$}，类似于损失函数，它衡量了我们当前的猜测离真实解有多远。同时，我们设计一个由一组经典参数 $\ivec{\theta}$ 控制的浅层量子电路，输入参数 $\ivec{\theta}$，将输出一个量子态 $\ket{\scalarfield(\ivec{\theta})}$。这个量子态就是我们对解的“猜测”。
+
+    \item 在量子计算机中，根据当前参数 $\ivec{\theta}$制备出试验解量子态 $\ket{\scalarfield(\ivec{\theta})}$。随后计算（测量）出当前参数对应的成本函数值 $C(\ivec{\theta})$，以及梯度信息 $\nabla_{\ivec{\theta}} C(\ivec{\theta})$。
+
+    \item 将成本函数值和梯度信息传回经典计算机，使用梯度下降法更新参数（$\eta$ 为学习率）：
+    \begin{equation*}
+        \ivec{\theta}_{\text{new}} \leftarrow \ivec{\theta}_{\text{old}} - \eta \nabla_{\ivec{\theta}} C(\ivec{\theta})
+    \end{equation*}
+\end{enumerate}
+
+不断迭代上述过程：经典计算机持续调整参数 $\ivec{\theta}$，量子计算机则不断评估新参数的好坏。当成本函数 $C(\ivec{\theta})$ 收敛至最小值时终止。此时得到的最优参数 $\ivec{\theta}^*$ 所对应的量子态 $\ket{\scalarfield(\ivec{\theta}^*)}$，就是我们所求线性方程组的近似解。
+
+通过这种方式，VQLS将计算量最大的部分（高维向量的矩阵运算）交由量子计算机处理，而优化迭代的步骤仍然在经典计算机上执行。这种策略有效降低了对量子硬件的要求，因为它将一个长而复杂的量子算法（如HHL）分解为一系列短而浅的量子电路执行，从而显著降低了对量子比特相干时间和门保真度的要求。这使得VQLS在当前充满噪声、比特数有限的NISQ设备上运行成为可能。
+
+然而，岳老师也坦率地指出，VQLS面临着固有的、艰难的挑战——\textbf{“贫瘠高原” (Barren Plateaus)} 问题：随着问题规模（即量子比特数 $n$）的增加，成本函数景观在参数空间中趋于平坦，导致梯度信息的丢失，基于梯度的优化器将难以找到有效的下降方向，进而无法收敛。
+岳老师讲解至此的时候，我联想到了深度学习中的“梯度消失”问题。
+在深度学习领域，研究者们通过采用更先进的优化器（如AdamS, RMSProp等），已经部分克服了这一难题。这些自适应优化算法通过引入动量、动态调整各参数的学习率等机制，表现出了更强的寻优能力。因此，我认为如果在VQLS中，用AdamS、RMSProp等优化器替代传统的梯度下降法，或许可以帮助算法更有效地在“贫瘠高原”上导航，从而缓解收敛困难的问题。
+
+
+
+
+\section{总结}
+
+在本次讲座中，岳天祥老师为我们描绘了一幅从经典地球科学建模到前沿量子计算应用的宏伟蓝图。HASM方法有着坚实的数学理论基础，为高精度地表建模提供了强大的理论支持。然而，随着分辨率的不断提升，经典计算能力的瓶颈日益凸显，将目光投向量子计算成为必然。尽管在NISQ时代，仍然存在着一些困难的挑战，但是从HHL算法到VQLS，我们已经看到了量子计算在解决大规模科学计算问题上的巨大潜力。
+
+\end{document}

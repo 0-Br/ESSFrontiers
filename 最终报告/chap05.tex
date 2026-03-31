@@ -1,0 +1,104 @@
+\section{基于扩散模型的流形学习}
+\label{sec:deep_learning}
+
+一个关键的问题是: 如何在数值上解析流形的几何结构和随机动力学算子？
+我们面临着许多困难: 流形 $\manifold$ 的维度与嵌入模式未知；动力学算子 $\drift, \difftensor$ 没有解析表达式，基于第一性原理的建模又过于复杂；度量张量 $\metric$ 依赖于过多较强的简化假设，且显式计算需要求高阶导数 $\jacobian_{\drift}$，这在高维系统中是不可行的。
+
+幸运的是，长期以来我们已经积累了海量的历史观测资料。
+数据驱动的方法因此成为了可能——我们可以直接从数据中学习流形，而无需描述复杂的物理建过程。
+\textbf{扩散模型 (Diffusion Models)} 为此提供了理想的工具，其通过评分函数 $\nabla_{\fastvar} \log p(\fastvar)$ 隐式表示了流形的概率几何。
+本章将结合前述数学框架，介绍扩散模型是如何从观测中重构流形 $\manifold$ 与演化算子 $\evolop_t$ 的。
+
+\subsection{扩散模型}
+
+扩散模型的核心思想源于非平衡统计力学: 设计一个可控的扩散过程，将复杂的数据分布 $p_{\text{data}}(\fastvar)$ 逐步映射为简单的先验分布 (通常为标准高斯 $\normdist(0, I)$)，再通过学习逆向过程从先验噪声中重构数据。
+定义正向扩散为Ornstein-Uhlenbeck过程:
+\begin{equation}
+\label{eq:forward_diffusion}
+    d\fastvar_t = -\frac{1}{2}\beta(t)\fastvar_t\,dt + \sqrt{\beta(t)}\,d\wiener_t, \quad t \in [0, T]
+\end{equation}
+
+其中 $\beta(t) > 0$ 为噪声调度函数，$\wiener_t$ 是标准布朗运动。
+该过程的解析解为 $\fastvar_t = \sqrt{\bar{\alpha}_t}\,\fastvar_0 + \sqrt{1-\bar{\alpha}_t}\,\bm{\epsilon}$，其中 $\bm{\epsilon} \sim \normdist(0, I)$ 且 $\bar{\alpha}_t = \exp(-\frac{1}{2}\int_0^t \beta(s)\,ds)$。
+当 $t \to T$ 且 $\bar{\alpha}_T \to 0$ 时，$\fastvar_T$ 的边缘分布收敛至 $\normdist(0, I)$，数据的结构信息被噪声完全淹没。
+
+逆向过程的关键在于Anderson定理 \cite{anderson1982reverse}: 正向扩散SDE在时间反转下仍为SDE，其漂移项由评分函数决定:
+\begin{equation}
+\label{eq:reverse_diffusion}
+    d\fastvar_t = \left[\frac{1}{2}\beta(t)\fastvar_t - \beta(t)\nabla_{\fastvar} \log p_t(\fastvar_t)\right]dt + \sqrt{\beta(t)}\,d\bar{\wiener}_t
+\end{equation}
+
+这里 $\bar{\wiener}_t$ 是反向时间的布朗运动，$\nabla_{\fastvar} \log p_t$ 称为时刻 $t$ 的评分函数。
+若能准确估计评分函数，则从 $\fastvar_T \sim \normdist(0, I)$ 出发，沿方程 \eqref{eq:reverse_diffusion} 积分至 $t=0$，即可采样得到 $\fastvar_0 \sim p_{\text{data}}$。
+这一逆向过程可理解为沿概率密度梯度的引导扩散: 在每个时刻，系统既受随机扰动 (布朗运动项)，又受评分函数的漂移驱动，后者将样本推向高概率密度区域，最终收敛至数据流形。
+
+我们通过\textbf{去噪评分匹配 (Denoising Score Matching)} 实现对评分函数的估计 \cite{vincent2011connection}。
+考虑到 $p(\fastvar_t|\fastvar_0) = \normdist(\sqrt{\bar{\alpha}_t}\fastvar_0, (1-\bar{\alpha}_t)I)$，其评分为 $\nabla_{\fastvar_t} \log p(\fastvar_t|\fastvar_0) = -\frac{\fastvar_t - \sqrt{\bar{\alpha}_t}\fastvar_0}{1-\bar{\alpha}_t} = -\frac{\bm{\epsilon}}{\sqrt{1-\bar{\alpha}_t}}$。
+因此，训练神经网络 $\bm{\epsilon}_\theta(\fastvar_t, t)$ 预测噪声 $\bm{\epsilon}$，等价于学习评分函数:
+\begin{equation}
+\label{eq:denoising_loss}
+    \mathcal{L}_{\text{denoise}} = \E_{t \sim \mathcal{U}[0,T], \fastvar_0 \sim p_{\text{data}}, \bm{\epsilon} \sim \normdist(0,I)}\left[\left\|\bm{\epsilon}_\theta\left(\sqrt{\bar{\alpha}_t}\fastvar_0 + \sqrt{1-\bar{\alpha}_t}\bm{\epsilon}, t\right) - \bm{\epsilon}\right\|^2\right]
+\end{equation}
+
+这一目标函数将评分匹配转化为标准的监督学习问题: 对于每个训练样本 $\fastvar_0$，随机采样噪声水平 $t$ 和高斯噪声 $\bm{\epsilon}$，构造加噪样本 $\fastvar_t$，训练网络从 $\fastvar_t$ 重构 $\bm{\epsilon}$。
+训练完成后，神经网络 $\bm{\epsilon}_\theta$ 隐式地参数化了全时间区间 $[0,T]$ 上评分函数族 $\{\nabla \log p_t\}_{t \in [0,T]}$。
+
+\subsection{流形的隐式表示}
+
+扩散模型学习流形的机制可从评分函数的几何意义理解。
+回顾流形假设 (假设 \ref{ass:manifold_hypothesis}): 数据分布 $p_{\text{data}}$ 的支撑集为低维流形 $\manifold \subset \dataspace$，$\dim(\manifold) = \manifolddim \ll N$。
+在流形外，概率密度 $p_{\text{data}}(\fastvar) = 0$；在流形内部及其邻域，密度函数沿流形的法空间快速衰减。
+因此，评分函数 $\nabla \log p_{\text{data}}$ 在流形上指向密度梯度方向，其分量可分解为切向分量 (沿流形内的密度变化) 和法向分量 (指向流形方向)。
+当样本偏离流形时，法向分量占主导，评分函数强烈地将其拉回流形；当样本位于流形内部时，切向分量引导其沿流形表面向高密度区域移动。
+
+在扩散模型的正向过程中，噪声的注入使得中间分布 $p_t$ 的支撑集从低维流形 $\manifold$ 扩展至全空间 $\dataspace$，但流形的几何结构以软约束的形式保留在 $p_t$ 的统计特征中。
+逆向过程则沿评分函数的梯度流逐步收缩分布支撑: 从全空间的高斯分布出发，评分函数引导样本穿越概率场景，最终收敛至低维流形。
+这一过程可视为\textbf{几何退火 (Geometric Annealing)}: 高噪声水平 ($t$ 接近 $T$) 时，评分函数捕获全局拓扑结构；低噪声水平 ($t$ 接近 $0$) 时，评分函数细化局部流形几何。
+多尺度的去噪过程隐式地学习了流形的层次表示。
+
+另外，我们考虑评分函数的Hessian矩阵 $\nabla^2 \log p_{\text{data}}$，即\textbf{Fisher信息矩阵}。
+在统计流形理论中，Fisher信息矩阵定义了参数空间的黎曼度量，量化了概率分布对参数扰动的敏感性。
+在数据流形上，$\nabla^2 \log p_{\text{data}}$ 的特征值分解揭示了流形的主曲率方向: 沿流形切空间的特征值反映了密度函数的内在变化率，而沿法空间的特征值则表征了分布从流形向环境空间的衰减速度。
+扩散模型通过学习评分函数，隐式地近似了流形的几何结构，使得逆向采样自然地适应流形的局部曲率与全局拓扑。
+
+\subsection{条件生成框架}
+
+将扩散模型扩展至条件生成框架，可实现对地球系统未来状态的概率预报。
+设 $\fastvar_0$ 为初始状态，$\fastvar_{\predtime}$ 为时间 $\predtime$ 后的未来状态，目标是学习条件分布 $p(\fastvar_{\predtime}|\fastvar_0)$。
+在条件扩散模型中，将初始条件 $\fastvar_0$ 编码为神经网络的额外输入，修改噪声预测器为 $\bm{\epsilon}_\theta(\fastvar_t, t, \fastvar_0)$，训练目标变为:
+\begin{equation}
+\label{eq:conditional_diffusion}
+    \mathcal{L}_{\text{cond}} = \E_{t, \fastvar_0, \fastvar_{\predtime}, \bm{\epsilon}}\left[\left\|\bm{\epsilon}_\theta\left(\sqrt{\bar{\alpha}_t}\,\fastvar_{\predtime} + \sqrt{1-\bar{\alpha}_t}\,\bm{\epsilon}, t, \fastvar_0\right) - \bm{\epsilon}\right\|^2\right]
+\end{equation}
+
+其中期望对 $(\fastvar_0, \fastvar_{\predtime})$ 的联合分布求取，该分布可从历史观测轨迹中采样得到。
+训练完成后，推理时从 $\fastvar_T \sim \normdist(0, I)$ 开始，沿条件逆向SDE积分:
+\begin{equation}
+\label{eq:conditional_reverse}
+    d\fastvar_t = \left[\frac{1}{2}\beta(t)\fastvar_t - \beta(t)\nabla_{\fastvar} \log p_t(\fastvar_t|\fastvar_0)\right]dt + \sqrt{\beta(t)}\,d\bar{\wiener}_t
+\end{equation}
+
+得到 $\fastvar_{\predtime}$ 的一次采样。
+重复采样 $M$ 次，即得集合预报 $\{\fastvar_{\predtime}^{(i)}\}_{i=1}^M$，其经验分布逼近条件概率 $p(\fastvar_{\predtime}|\fastvar_0)$。
+相比确定性预报模型，条件扩散模型自然地量化了预测不确定性: 集合成员的分散度反映了动力学演化的内在随机性与初值敏感性。
+
+条件生成框架实际上与第 \ref{sec:sde_measure} 章中的随机动力学过程是一致的。
+方程 \eqref{eq:conditional_reverse} 中的条件评分函数 $\nabla \log p_t(\fastvar_t|\fastvar_0)$ 编码了从初值 $\fastvar_0$ 出发的动力学流的几何信息。
+在小噪声极限下 ($\beta(t) \to 0$)，逆向SDE退化为确定性ODE，对应于动力学系统的平均场演化；在有限噪声下，扩散项捕获了次网格过程与参数化不确定性的随机效应。
+因此，条件扩散模型可视为在概率测度空间 $\mathcal{P}(\manifold)$ 上学习演化算子 $\evolop_t^*: \mathcal{P}(\manifold) \to \mathcal{P}(\manifold)$ 的非参数估计，其中 $\evolop_t^*$ 将初值分布映射为未来时刻的分布。
+
+事实上，条件生成框架还隐式地学习了度量张量。
+在扩散模型框架下，记 $\Delta p_t(\fastvar|\fastvar_A, \fastvar_B) := p_t(\fastvar|\fastvar_B) - p_t(\fastvar|\fastvar_A)$ 为两初值条件下时刻 $t$ 的概率密度差。
+当 $\|\fastvar_B - \fastvar_A\|$ 充分小时，$\Delta p_t$ 可由评分函数的差分近似:
+\begin{equation}
+\label{eq:delta_p_score}
+    \Delta p_t(\fastvar|\fastvar_A, \fastvar_B) \approx p_t(\fastvar|\fastvar_A) \cdot (\fastvar_B - \fastvar_A)^\top \nabla_{\fastvar_0} \nabla_{\fastvar} \log p_t(\fastvar|\fastvar_A)
+\end{equation}
+
+这里 $\nabla_{\fastvar_0} \nabla_{\fastvar} \log p_t$ 是条件评分函数关于初值的梯度，其Frobenius范数的积分量化了初值扰动对整个条件分布的影响:
+\begin{equation}
+\label{eq:metric_from_score}
+    \|\Delta p_t\|_{L^2}^2 \propto (\fastvar_B - \fastvar_A)^\top \underbrace{\int_{\dataspace} p_t(\fastvar|\fastvar_A) \left[\nabla_{\fastvar_0} \nabla_{\fastvar} \log p_t\right]^\top \left[\nabla_{\fastvar_0} \nabla_{\fastvar} \log p_t\right] d\fastvar}_{\text{等效度量张量 } \tilde{\metric}_t} (\fastvar_B - \fastvar_A)
+\end{equation}
+
+因此，扩散模型通过学习评分函数，隐式地构造了度量张量。

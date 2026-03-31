@@ -1,0 +1,25 @@
+\section{引言}
+
+地球系统横跨从湍流涡旋到行星波的时空尺度，其状态空间维度高达$10^6$量级，呈现出复杂的多尺度耦合与非线性相互作用 \cite{ghil2008climate,majda2012climate}。
+自Lorenz \cite{lorenz1963deterministic}揭示确定性混沌以来，初值敏感性被视为天气预报的根本障碍。
+气候系统中更为复杂的随机强迫与多尺度作用进一步加剧了预测难度 \cite{lorenz1969predictability,thompson1957uncertainty}。
+维度爆炸问题使直接数值模拟十分困难，而不同尺度间的强耦合又令简单的线性降维方法失去效用 \cite{palmer1993extended,dijkstra2013nonlinear}。
+这一困境的本质在于: 我们既需要应对高维状态空间的维度灾难，又需要理解混沌与随机扰动的协同作用机制。
+
+过去几十年的研究形成了若干独立的理论路径，但仍存在显著的认知差距。
+Hasselmann \cite{hasselmann1976stochastic}的随机气候模型将次网格过程参数化为随机强迫，Arnold \cite{arnold1998random}与Pavliotis \cite{pavliotis2014stochastic}为其奠定了严格的随机动力学基础，然而这一框架主要关注扩散过程，对确定性混沌的刻画不足。
+EOF分解 \cite{hasselmann1988pips}成功识别了ENSO \cite{trenberth1997definition}、NAO \cite{hurrell1995decadal}等气候模态，暗示存在低维流形结构 \cite{fefferman2016testing}，但流形假设缺乏从动力学方程和物理约束出发的第一性原理推导。
+Amari的信息几何 \cite{amari2016information,amari1998natural}为概率分布空间赋予了黎曼度量，却未能解释如何从混沌与扩散的共同作用中导出状态空间的动力学度量。
+Scheffer等 \cite{scheffer2009early}发现临界慢化与方差发散可作为临界转变的预警信号，Lenton等 \cite{lenton2008tipping}识别了AMOC、格陵兰冰盖等潜在临界要素，但这些现象仍缺乏统一的几何-概率解释框架。
+
+现有研究面临五个核心问题。
+其一，确定性混沌与随机扰动如何协同作用，共同塑造系统的长期统计性质？Lorenz型混沌理论聚焦于Lyapunov指数，随机参数化侧重于噪声驱动的扩散，二者缺乏统一的数学语言 \cite{eckmann1985ergodic}。
+其二，流形假设在机器学习中广泛应用 \cite{vapnik1999nature}，但针对地球系统这一具有明确物理起源的高维动力系统，如何从时间尺度分离和守恒律等第一性原理严格推导流形的存在性与维度？现有EOF和流形学习方法 \cite{coifman2006diffusion,berry2016variable}本质上是经验性的。
+其三，欧氏距离无法反映动力学相似性——ENSO核心区的小温度扰动可触发全球遥相关，而全球均匀的微小扰动却几乎无影响。如何从动力学第一性原理导出编码可预报性、临界慢化与扰动放大的黎曼度量？
+其四，当我们说“气候正在改变”时，指的是不变测度的连续演化 (如$\text{CO}_2$浓度渐变) 还是吸引子的拓扑突变 (如AMOC崩溃)？现有文献对不同层次的变化缺乏清晰的数学区分 \cite{ipcc2021ar6,slingo2011uncertainty}。
+
+针对这些问题，本文建立地球系统的\textbf{概率流形理论}，将流形几何、随机动力学与概率测度有机融合为统一框架。
+我们将气候定义为参数化的随机动力系统$(\manifold_{\slowvar}, \drift_{\slowvar}, \diffop_{\slowvar})$: 物理约束诱导低维流形$\manifold_{\slowvar}$，确定性漂移$\drift_{\slowvar}$与随机扩散$\diffop_{\slowvar}$共同驱动演化，进而诱导稳态概率测度$\measure_{\slowvar}$和编码动力学信息的黎曼度量$\metric_{\slowvar}$。
+本文的核心贡献包括: 从时间尺度分离与物理约束推导流形的存在性，为EOF方法提供第一性原理解释 (第 \ref{sec:manifold_hypothesis} 节)；基于Fokker-Planck方程构造不变测度的严格测度论框架，揭示均值与方差对动力学参数的$O(1/\difftensor)$与$O(1/\difftensor^2)$敏感性，解释极端事件频率的指数增长 (第 \ref{sec:sde_measure} 章)；通过分析初值不确定性在混沌与扩散下的传播定义动力学距离，导出自然编码Lyapunov指数、可预报性与临界慢化的度量张量 (第 \ref{sec:metric_tensor} 章)；阐述扩散模型 \cite{ho2020denoising,song2021scorebased}与地球系统随机动力学的深刻联系，提出从数据非参数估计转移核并提取度量张量的方法，为物理模型与机器学习融合提供理论桥梁 (第 \ref{sec:deep_learning} 章)；提出气候变化的二分类体系，I类变化对应测度连续演化 (吸引子拓扑不变)，II类变化对应拓扑突变 (临界转变)，将临界预警信号统一解释为度量张量的奇异性 (第 \ref{sec:climate_change} 章)。
+
+本文的创新在于建立了从动力学方程到几何-概率结构的完整推导链条，将混沌与扩散纳入统一的度量张量框架，为气候变化、临界预警等关键现象提供了统一的数学解释，并开辟了扩散模型与物理建模融合的新范式。

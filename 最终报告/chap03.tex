@@ -1,0 +1,83 @@
+\section{Fokker-Planck方程与概率测度}
+\label{sec:sde_measure}
+
+由 \eqref{eq:sde} 定义的马尔可夫过程，其转移概率密度 $\probdens(\fastvar_t | \fastvar_0)$ 的演化满足\textbf{Fokker-Planck方程} \cite{gardiner2009stochastic}。
+这一方程描述了概率密度在状态空间中的“流动”，是联系随机轨迹 (微观) 与概率分布 (宏观) 的桥梁。
+
+\begin{theorem}[Fokker-Planck方程]
+\label{thm:fp}
+    设 $\probdens(\fastvar_t | \fastvar_0)$ 是从初始状态 $\fastvar_0$ 出发，在时刻 $t$ 位于 $\fastvar$ 的概率密度函数，则:
+    \begin{equation}
+    \label{eq:fp}
+        \frac{\partial \probdens}{\partial t} = -\sum_{i=1}^N \frac{\partial}{\partial x_i}(\drift_i(\fastvar; \slowvar) \probdens) + \frac{1}{2}\sum_{i,j=1}^N \frac{\partial^2}{\partial x_i \partial x_j}(\difftensor_{ij}(\fastvar; \slowvar) \probdens)
+    \end{equation}
+
+    其中 $\drift_i$ 是漂移向量场的第 $i$ 个分量，$\difftensor_{ij} = [\diffop\diffop^\top]_{ij}$ 是扩散张量的分量。
+\end{theorem}
+
+从Itô SDE出发，对任意测试函数 $\phi(\fastvar)$ 应用期望算子，然后对测试函数作分部积分，
+即得 \eqref{eq:fp}。
+完整证明见 \cite{pavliotis2014stochastic}。
+
+方程 \eqref{eq:fp} 具有清晰的物理意义清晰，概率密度的时间演化由两项驱动:
+\begin{itemize}
+    \item (漂移项) $-\sum_{i=1}^N \frac{\partial}{\partial x_i}(\drift_i(\fastvar; \slowvar) \probdens)$ 是\textbf{平流效应 (Advection)}，概率云被确定性向量场 $\drift$ 推动，如同流体中的质点随流场运动。
+    \item (扩散项) $\frac{1}{2}\sum_{i,j} \frac{\partial^2}{\partial x_i \partial x_j}(\difftensor_{ij}(\fastvar; \slowvar) \probdens)$ 是\textbf{扩散效应 (Diffusion)}，概率云因随机扰动而展宽，如同热扩散中的温度弥散。
+\end{itemize}
+
+两者共同决定了概率密度的长期演化行为。
+在足够长的时间后，如果系统满足遍历性条件，概率密度将趋于稳态，不再随时间变化。
+这一稳态概率密度 $\probdens_{ss}(\fastvar; \slowvar)$ 满足稳态Fokker-Planck方程:
+
+\begin{assumption}[稳态测度的存在性]
+\label{ass:stationary_measure}
+    对固定的 $\slowvar$，假设 SDE \eqref{eq:sde} 存在唯一的不变概率测度 $\measure_{\slowvar}$，其密度 $\probdens_{ss}(\fastvar; \slowvar)$ 满足稳态 Fokker-Planck 方程:
+    \begin{equation}
+    \label{eq:steady_fp}
+        \frac{\partial \probdens_{ss}}{\partial t} = -\sum_{i=1}^N \frac{\partial}{\partial x_i}(\drift_i(\fastvar; \slowvar) \probdens_{ss}) + \frac{1}{2}\sum_{i,j=1}^N \frac{\partial^2}{\partial x_i \partial x_j}(\difftensor_{ij}(\fastvar; \slowvar) \probdens_{ss}) = 0
+    \end{equation}
+\end{assumption}
+
+稳态方程 \eqref{eq:steady_fp} 表明，在稳态下，平流效应和扩散效应达到精确平衡: 向量场将概率密度推向某些区域，而扩散将其散布到更广的范围，两者的净效应相互抵消，概率分布保持不变。
+这一平衡态即为\textbf{气候 (Climate)} 的数学定义——它是随机轨迹 (天气) 的长期统计性质。
+
+\begin{definition}[概率测度]
+\label{def:probability_measure}
+    对固定的 $\slowvar$，概率测度 $\measure_{\slowvar}$ 由稳态密度 $\probdens_{ss}(\fastvar; \slowvar)$ 定义:
+    \begin{equation}
+    \label{eq:probability_measure}
+        \measure_{\slowvar}(A) = \int_A \probdens_{ss}(\fastvar; \slowvar)\,d\fastvar, \quad \forall A \in \borel(\manifold)
+    \end{equation}
+
+    其中 $\borel(\manifold)$ 是流形的 Borel $\sigma$-代数。
+\end{definition}
+
+\begin{assumption}[遍历性]
+\label{ass:ergodicity}
+    假设马尔可夫过程 $\{\fastvar_t\}$ 在不变概率测度 $\measure_{\slowvar}$ 下是遍历的，即对任意可测函数 $\climind: \manifold \to \R$:
+    \begin{equation}
+    \label{eq:ergodic}
+        \lim_{T \to \infty} \frac{1}{T}\int_0^T \climind(\fastvar_t)\,dt = \int_{\manifold} \climind(\fastvar)\,d\measure_{\slowvar}(\fastvar), \quad \text{几乎处处成立}
+    \end{equation}
+\end{assumption}
+
+遍历性保证了时间平均和空间平均的等价性，是统计力学的基石 \cite{eckmann1985ergodic}。
+想象一个粒子在流形 $\manifold$ 上遵循 Itô SDE \eqref{eq:sde} 进行随机游走。
+给定足够长的时间，粒子会“走遍”流形的每个位置，在任意区域 $A$ 停留的时间比例 $\approx \measure_{\slowvar}(A)$。
+除了零测集外，不存在粒子“永远无法到达”或“永远困在其中”的区域。
+这意味着，长时间的观测可以充分采样概率测度，单个轨迹的时间平均可以代表集合平均。
+
+在地球系统科学研究中，我们通常只能获得一条时间序列——比如某个气象站40年的逐日温度记录。
+遍历性告诉我们: 这一条长时间序列的统计量 (如均值、方差) 趋近于真实的气候态，即温度的概率分布。
+也就是说，\textbf{我们可以用对系统的长时间观察代替随机采样}。
+这为从有限观测数据中推断地球系统的统计性质和气候学研究提供了理论保证。
+
+遍历性假设在如下充分条件下可被严格证明 \cite{hairer2006ergodic}:
+\begin{enumerate}
+    \item 一致椭圆性: 扩散张量 $\difftensor(\fastvar; \slowvar)$ 处处非退化，即 $\exists \eigenval_{\min} > 0$ 使得 $\bm{\xi}^\top \difftensor(\fastvar; \slowvar) \bm{\xi} \geq \eigenval_{\min} \|\bm{\xi}\|^2$ 对所有 $\fastvar \in \manifold$ 和 $\bm{\xi} \in \R^N$ 成立；
+    \item 次线性增长条件: $\exists C > 0$ 使得 $\|\drift(\fastvar; \slowvar)\| \leq C(1 + \|\fastvar\|)$ 对所有 $\fastvar \in \manifold$ 成立；
+    \item 耗散性: $\exists \alpha, \beta > 0$ 使得 $\langle \drift(\fastvar; \slowvar), \fastvar \rangle \leq -\alpha \|\fastvar\|^2 + \beta$ 对充分大的 $\|\fastvar\|$ 成立。
+\end{enumerate}
+
+对于地球系统而言，这些条件在物理上具有合理性: 条件 (1) 要求次网格随机扰动处处非零 (湍流、对流过程无处不在); 条件 (2) 要求物理量不会无限增长 (温度、风速存在能量上界约束); 条件 (3) 要求存在能量耗散机制 (摩擦、辐射冷却、边界层拖曳)。
+因此，我们认为遍历性假设在地球系统中是成立的。
