@@ -1,19 +1,16 @@
-# LaTeX build artifacts
+# LaTeX 编译产物
 *.aux
 *.log
 *.out
 *.toc
-*.lof
-*.lot
+*.synctex.gz
 *.fls
 *.fdb_latexmk
-*.synctex.gz
+*.bbl
 *.blg
-*.run.xml
-*.bcf
 *.nav
 *.snm
 *.vrb
-
-# Data files
-*.nc
+*.run.xml
+*.bcf
+*-blx.bib
